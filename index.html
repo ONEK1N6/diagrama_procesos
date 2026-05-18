@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Procesos</title>
+    <style>
+        :root {
+            --color-strat: #d4a017;
+            --color-strat-sub: #e6b422;
+            --color-strat-sub2: #f5d060;
+            --color-value: #5b9bd5;
+            --color-value-sub: #70b3e0;
+            --color-value-sub2: #a8d1f0;
+            --color-support: #7f7f7f;
+            --color-support-sub: #999999;
+            --color-support-sub2: #b3b3b3;
+            --color-io: #70ad47;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .map-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 1500px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-top: 0;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 15px;
+        }
+
+        /* Secciones */
+        .section {
+            margin-bottom: 50px;
+        }
+
+        .section-header {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-left: 5px solid #ccc;
+            padding-left: 10px;
+        }
+
+        /* Grid de columnas */
+        .grid-row {
+            display: grid;
+            gap: 20px;
+            justify-items: center;
+        }
+
+        .grid-strat { grid-template-columns: repeat(3, 1fr); }
+        .grid-value { grid-template-columns: repeat(4, 1fr); }
+        .grid-support { grid-template-columns: repeat(5, 1fr); }
+
+        .process-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* Estilo base del Pentágono */
+        .pentagon {
+            width: 100%;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            font-size: 13px;
+            position: relative;
+            clip-path: polygon(0% 0%, 90% 0%, 100% 50%, 90% 100%, 0% 100%);
+            margin-bottom: 3px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            padding: 0 10px;
+            box-sizing: border-box;
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+
+        .pentagon:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        /* Subniveles */
+        .sub-pentagon {
+            height: 45px;
+            font-size: 11px;
+            font-weight: normal;
+            opacity: 0.95;
+            display: none;
+            transition: all 0.3s ease;
+        }
+
+        .sub-pentagon.visible {
+            display: flex;
+            animation: fadeSlideIn 0.3s ease forwards;
+        }
+
+        /* Subniveles ocultos (Nivel 3) */
+        .sub-sub-pentagon {
+            height: 35px;
+            font-size: 10px;
+            font-weight: normal;
+            opacity: 0.85;
+            clip-path: polygon(5% 0%, 95% 0%, 100% 50%, 95% 100%, 5% 100%);
+            display: none;
+            cursor: default;
+            transition: all 0.3s ease;
+        }
+
+        .sub-sub-pentagon.visible {
+            display: flex;
+            animation: fadeSlideIn 0.3s ease forwards;
+        }
+
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* Indicador visual de clickable */
+        .pentagon::after {
+            content: ' ▼';
+            font-size: 8px;
+            opacity: 0.6;
+            margin-left: 4px;
+        }
+
+        .sub-sub-pentagon::after {
+            content: none;
+        }
+
+        .pentagon.expanded::after {
+            content: ' ▲';
+        }
+
+        /* Colores Estratégicos */
+        .strat .pentagon { background-color: var(--color-strat); }
+        .strat .sub-pentagon { background-color: var(--color-strat-sub); color: #333; }
+        .strat .sub-sub-pentagon { background-color: var(--color-strat-sub2); color: #444; }
+        .strat .section-header { border-color: var(--color-strat); }
+
+        /* Colores Valor */
+        .value .pentagon { background-color: var(--color-value); }
+        .value .sub-pentagon { background-color: var(--color-value-sub); color: #333; }
+        .value .sub-sub-pentagon { background-color: var(--color-value-sub2); color: #444; }
+        .value .section-header { border-color: var(--color-value); }
+
+        /* Colores Soporte */
+        .support .pentagon { background-color: var(--color-support); }
+        .support .sub-pentagon { background-color: var(--color-support-sub); color: #333; }
+        .support .sub-sub-pentagon { background-color: var(--color-support-sub2); color: #444; }
+        .support .section-header { border-color: var(--color-support); }
+
+        /* Inputs y Outputs */
+        .io-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .io-block {
+            width: 150px;
+            background-color: var(--color-io);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 10px;
+        }
+
+        /* Leyenda */
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        .legend-click-hint {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 12px;
+            color: #999;
+            font-style: italic;
+        }
+
+        /* Responsive */
+        @media (max-width: 1100px) {
+            .grid-strat { grid-template-columns: repeat(2, 1fr); }
+            .grid-value { grid-template-columns: repeat(2, 1fr); }
+            .grid-support { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 700px) {
+            body { padding: 15px; }
+            .map-container { padding: 20px; }
+            .grid-strat, .grid-value, .grid-support {
+                grid-template-columns: 1fr;
+            }
+            .pentagon {
+                clip-path: none;
+                border-radius: 5px;
+            }
+            .sub-sub-pentagon {
+                clip-path: none;
+                border-radius: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="map-container">
+        <h2>MAPA DE PROCESOS - CONSULTORIO ODONTOLÓGICO ROSALES</h2>
+
+        <!-- ===================== SECCIÓN 1: ESTRATÉGICOS ===================== -->
+        <div class="section strat">
+            <div class="section-header">ESTRATÉGICOS</div>
+            <div class="grid-row grid-strat">
+
+                <!-- E01 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">E01. Planificación Estratégica y Dirección</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">E01.1 Definición de objetivos</div>
+                    <div class="pentagon sub-sub-pentagon">E01.1.1 Analizar situación actual</div>
+                    <div class="pentagon sub-sub-pentagon">E01.1.2 Establecer metas anuales</div>
+                    <div class="pentagon sub-sub-pentagon">E01.1.3 Aprobar presupuesto</div>
+                    <div class="pentagon sub-sub-pentagon">E01.1.4 Comunicar objetivos al equipo</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">E01.2 Supervisión y seguimiento de metas</div>
+                    <div class="pentagon sub-sub-pentagon">E01.2.1 Revisar indicadores mensuales</div>
+                    <div class="pentagon sub-sub-pentagon">E01.2.2 Evaluar avance de metas</div>
+                    <div class="pentagon sub-sub-pentagon">E01.2.3 Identificar desviaciones</div>
+                    <div class="pentagon sub-sub-pentagon">E01.2.4 Tomar acciones correctivas</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">E01.3 Toma de decisiones estratégicas</div>
+                    <div class="pentagon sub-sub-pentagon">E01.3.1 Recopilar información relevante</div>
+                    <div class="pentagon sub-sub-pentagon">E01.3.2 Analizar alternativas</div>
+                    <div class="pentagon sub-sub-pentagon">E01.3.3 Comunicar decisión al equipo</div>
+                </div>
+
+                <!-- E02 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">E02. Gestión y control de calidad</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">E02.1 Monitoreo de indicadores de calidad</div>
+                    <div class="pentagon sub-sub-pentagon">E02.1.1 Definir indicadores clave</div>
+                    <div class="pentagon sub-sub-pentagon">E02.1.2 Recolectar datos mensuales</div>
+                    <div class="pentagon sub-sub-pentagon">E02.1.3 Calcular resultados</div>
+                    <div class="pentagon sub-sub-pentagon">E02.1.4 Comparar con metas</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">E02.2 Auditorías internas</div>
+                    <div class="pentagon sub-sub-pentagon">E02.2.1 Planificar auditoría</div>
+                    <div class="pentagon sub-sub-pentagon">E02.2.2 Ejecutar auditoría</div>
+                    <div class="pentagon sub-sub-pentagon">E02.2.3 Identificar no conformidades</div>
+                    <div class="pentagon sub-sub-pentagon">E02.2.4 Elaborar informe de auditoría</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">E02.3 Evaluación de satisfacción</div>
+                    <div class="pentagon sub-sub-pentagon">E02.3.1 Aplicar encuesta al paciente</div>
+                    <div class="pentagon sub-sub-pentagon">E02.3.2 Recolectar respuestas</div>
+                    <div class="pentagon sub-sub-pentagon">E02.3.3 Analizar resultados</div>
+                    <div class="pentagon sub-sub-pentagon">E02.3.4 Implementar mejoras</div>
+                </div>
+
+                <!-- E03 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">E03. Gestión normativa</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">E03.1 Actualización de Guías de Práctica Clinica (GPC)</div>
+                    <div class="pentagon sub-sub-pentagon">E03.1.1 Revisar nuevas GPC del MINSA</div>
+                    <div class="pentagon sub-sub-pentagon">E03.1.2 Comparar con procedimientos actuales</div>
+                    <div class="pentagon sub-sub-pentagon">E03.1.3 Actualizar protocolos internos</div>
+                    <div class="pentagon sub-sub-pentagon">E03.1.4 Capacitar al personal</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">E03.2 Verificación del Cumplimiento de normativas MINSA</div>
+                    <div class="pentagon sub-sub-pentagon">E03.2.1 Identificar normativas aplicables</div>
+                    <div class="pentagon sub-sub-pentagon">E03.2.2 Verificar cumplimiento</div>
+                    <div class="pentagon sub-sub-pentagon">E03.2.3 Registrar hallazgos</div>
+                    <div class="pentagon sub-sub-pentagon">E03.2.4 Subsanar incumplimientos</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">E03.3 Manejo de riesgos legales y ético</div>
+                    <div class="pentagon sub-sub-pentagon">E03.3.1 Identificar riesgos potenciales</div>
+                    <div class="pentagon sub-sub-pentagon">E03.3.2 Evaluar probabilidad e impacto</div>
+                    <div class="pentagon sub-sub-pentagon">E03.3.3 Implementar controles</div>
+                    <div class="pentagon sub-sub-pentagon">E03.3.4 Monitorear efectividad</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===================== SECCIÓN 2: CREACIÓN DE VALOR ===================== -->
+        <div class="section value">
+            <div class="section-header">DE CREACIÓN DE VALOR</div>
+
+            <div class="io-container">
+                <div class="io-block">Necesidades del Cliente</div>
+                <div class="io-block">Satisfacción del Cliente</div>
+            </div>
+
+            <div class="grid-row grid-value">
+
+                <!-- V01 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">V01. Admisión de Citas y Agendamiento</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V01.1 Recepción de llamadas</div>
+                    <div class="pentagon sub-sub-pentagon">V01.1.1 Atender llamada entrante</div>
+                    <div class="pentagon sub-sub-pentagon">V01.1.2 Identificar motivo de consulta</div>
+                    <div class="pentagon sub-sub-pentagon">V01.1.3 Verificar si es paciente nuevo o recurrente</div>
+                    <div class="pentagon sub-sub-pentagon">V01.1.4 Registrar datos básicos (si es nuevo)</div>                  
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V01.2 Verificación de disponibilidad de agenda</div>
+                    <div class="pentagon sub-sub-pentagon">V01.2.1 Consultar agenda del odontólogo</div>
+                    <div class="pentagon sub-sub-pentagon">V01.2.2 Identificar horarios libres</div>
+                    <div class="pentagon sub-sub-pentagon">V01.2.3 Verificar duración del procedimiento</div>
+                    <div class="pentagon sub-sub-pentagon">V01.2.4 Confirmar disponibilidad del consultorio</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V01.3 Asignación de fecha y hora</div>
+                    <div class="pentagon sub-sub-pentagon">V01.3.1 Proponer fechas disponibles al paciente</div>
+                    <div class="pentagon sub-sub-pentagon">V01.3.2 Confirmar fecha con el paciente</div>
+                    <div class="pentagon sub-sub-pentagon">V01.3.3 Confirmar hora con el paciente</div>
+                    <div class="pentagon sub-sub-pentagon">V01.3.4 Registrar cita en agenda</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V01.4 Confirmación de cita (llamada/mensaje)</div>
+                    <div class="pentagon sub-sub-pentagon">V01.4.1 Enviar confirmación de cita</div>
+                    <div class="pentagon sub-sub-pentagon">V01.4.2 Enviar recordatorio 24 horas antes</div>
+                    <div class="pentagon sub-sub-pentagon">V01.4.3 Confirmar asistencia del paciente</div>
+                    <div class="pentagon sub-sub-pentagon">V01.4.4 Reagendar si el paciente cancela</div>
+                </div>
+
+                <!-- V02 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">V02. Evaluación y Plan de Tratamiento</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V02.1 Anamnesis (historia médica)</div>
+                    <div class="pentagon sub-sub-pentagon">V02.1.1 Recibir al paciente</div>
+                    <div class="pentagon sub-sub-pentagon">V02.1.2 Preguntar antecedentes médicos</div>
+                    <div class="pentagon sub-sub-pentagon">V02.1.3 Registrar alergias</div>
+                    <div class="pentagon sub-sub-pentagon">V02.1.4 Registrar medicamentos actuales</div>
+                    <div class="pentagon sub-sub-pentagon">V02.1.5 Registrar enfermedades previas</div>
+                    <div class="pentagon sub-sub-pentagon">V02.1.6 Firmar consentimiento informado</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V02.2 Examen clínico intraoral y extraoral</div>
+                    <div class="pentagon sub-sub-pentagon">V02.2.1 Realizar examen intraoral</div>
+                    <div class="pentagon sub-sub-pentagon">V02.2.2 Realizar examen extraoral</div>                   
+                    <div class="pentagon sub-sub-pentagon">V02.2.3 Registrar hallazgos</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V02.3 Toma de radiografías</div>
+                    <div class="pentagon sub-sub-pentagon">V02.3.1 Solicitar radiografía necesaria</div>
+                    <div class="pentagon sub-sub-pentagon">V02.3.2 Colocar delantal plomado</div>
+                    <div class="pentagon sub-sub-pentagon">V02.3.3 Tomar y revelar radiografía</div>
+                    <div class="pentagon sub-sub-pentagon">V02.3.4 Interpretar hallazgos</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V02.4 Elaboración del plan de tratamiento</div>
+                    <div class="pentagon sub-sub-pentagon">V02.4.1 Identificar patología</div>
+                    <div class="pentagon sub-sub-pentagon">V02.4.2 Definir procedimientos necesarios</div>
+                    <div class="pentagon sub-sub-pentagon">V02.4.3 Estimar número de sesiones</div>
+                    <div class="pentagon sub-sub-pentagon">V02.4.4 Documentar plan en historia</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V02.5 Entrega de presupuesto detallado</div>
+                    <div class="pentagon sub-sub-pentagon">V02.5.1 Calcular costo por procedimiento</div>
+                    <div class="pentagon sub-sub-pentagon">V02.5.2 Elaborar presupuesto escrito</div>
+                    <div class="pentagon sub-sub-pentagon">V02.5.3 Explicar costos al paciente</div>
+                    <div class="pentagon sub-sub-pentagon">V02.5.4 Ofrecer opciones de pago</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V02.6 Firma de consentimiento informado</div>
+                    <div class="pentagon sub-sub-pentagon">V02.6.1 Explicar riesgos y beneficios</div>
+                    <div class="pentagon sub-sub-pentagon">V02.6.2 Informar alternativas</div>
+                    <div class="pentagon sub-sub-pentagon">V02.6.3 Resolver dudas del paciente</div>
+                    <div class="pentagon sub-sub-pentagon">V02.6.4 Solicitar y archivar firma</div>
+                </div>
+
+                <!-- V05 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">V05. Ejecución Tratamiento Odontológico</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V05.1 Verificación pre-procedimental</div>
+                    <div class="pentagon sub-sub-pentagon">V05.1.1 Verificar identidad del paciente</div>
+                    <div class="pentagon sub-sub-pentagon">V05.1.2 Revisar historia y consentimiento</div>
+                    <div class="pentagon sub-sub-pentagon">V05.1.3 Preparar instrumental y materiales</div>
+                    <div class="pentagon sub-sub-pentagon">V05.1.4 Confirmar plan de tratamiento</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V05.2 Preparación del paciente</div>
+                    <div class="pentagon sub-sub-pentagon">V05.2.1 Ubicar al paciente en unidad</div>
+                    <div class="pentagon sub-sub-pentagon">V05.2.2 Aplicar anestesia</div>
+                    <div class="pentagon sub-sub-pentagon">V05.2.3 Realizar aislamiento</div>
+                    <div class="pentagon sub-sub-pentagon">V05.2.4 Colocar babero y campos</div>                   
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V05.3 Realización del procedimiento según GPC</div>
+                    <div class="pentagon sub-sub-pentagon">V05.4.1 Realizar procedimiento según GPC</div>
+                    <div class="pentagon sub-sub-pentagon">V05.4.2 Tomar radiografías de control</div>
+                    <div class="pentagon sub-sub-pentagon">V05.4.3 Verificar calidad del tratamiento</div>
+                    <div class="pentagon sub-sub-pentagon">V05.4.4 Registrar en historia clínica</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V05.4 Finalización del procedimiento</div>
+                    <div class="pentagon sub-sub-pentagon">V05.5.1 Limpiar zona tratada</div>
+                    <div class="pentagon sub-sub-pentagon">V05.5.2 Realizar ajuste oclusal</div>
+                    <div class="pentagon sub-sub-pentagon">V05.5.3 Realizar pulido final</div>
+                    <div class="pentagon sub-sub-pentagon">V05.5.4 Retirar aislamiento</div>
+                </div>
+
+                <!-- V06 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">V06. Alta, Educación y Seguimiento</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V06.1 Indicaciones post-tratamiento inmediatas</div>
+                    <div class="pentagon sub-sub-pentagon">V06.1.1 Indicar cuidados inmediatos</div>
+                    <div class="pentagon sub-sub-pentagon">V06.1.2 Indicar medicación</div>
+                    <div class="pentagon sub-sub-pentagon">V06.1.3 Advertir signos de alarma</div>
+                    <div class="pentagon sub-sub-pentagon">V06.1.4 Resolver dudas del paciente</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V06.2 Educación en salud bucal</div>
+                    <div class="pentagon sub-sub-pentagon">V06.2.1 Enseñar técnica de cepillado</div>
+                    <div class="pentagon sub-sub-pentagon">V06.2.2 Enseñar uso de seda dental</div>
+                    <div class="pentagon sub-sub-pentagon">V06.2.3 Recomendar hábitos saludables</div>
+                    <div class="pentagon sub-sub-pentagon">V06.2.4 Entregar material educativo</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V06.3 Registro del alta inmediata en historia</div>
+                    <div class="pentagon sub-sub-pentagon">V06.3.1 Verificar tratamiento completadol</div>
+                    <div class="pentagon sub-sub-pentagon">V06.3.2 Registrar alta en historia</div>
+                    <div class="pentagon sub-sub-pentagon">V06.3.3 Registrar hallazgos finales</div>
+                    <div class="pentagon sub-sub-pentagon">V06.3.4 Firmar registro de alta</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V06.4 Programación de cita de control o seguimiento</div>
+                    <div class="pentagon sub-sub-pentagon">V06.4.1 Definir fecha de control</div>
+                    <div class="pentagon sub-sub-pentagon">V06.4.2 Consultar disponibilidad de agenda</div>
+                    <div class="pentagon sub-sub-pentagon">V06.4.3 Asignar fecha y hora</div>
+                    <div class="pentagon sub-sub-pentagon">V06.4.4 Entregar tarjeta de cita</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">V06.5 Evaluación en cita de seguimiento</div>
+                    <div class="pentagon sub-sub-pentagon">V06.5.1 Recibir al paciente en control</div>
+                    <div class="pentagon sub-sub-pentagon">V06.5.2 Evaluar éxito del tratamiento</div>
+                    <div class="pentagon sub-sub-pentagon">V06.5.3 Indicar siguiente control si aplica</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===================== SECCIÓN 3: SOPORTE ===================== -->
+        <div class="section support">
+            <div class="section-header">DE SOPORTE</div>
+            <div class="grid-row grid-support">
+
+                <!-- S01 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">S01. Gestión Administrativa y Documentación</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">S01.1 Manejo y archivo de historias clínicas</div>
+                    <div class="pentagon sub-sub-pentagon">S01.1.1 Recibir historia clínica</div>
+                    <div class="pentagon sub-sub-pentagon">S01.1.2 Verificar campos completos</div>
+                    <div class="pentagon sub-sub-pentagon">S01.1.3 Clasificar por orden</div>
+                    <div class="pentagon sub-sub-pentagon">S01.1.4 Almacenar en archivo</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">S01.2  Elaboración de reportes de producción</div>
+                    <div class="pentagon sub-sub-pentagon">S01.2.1 Recolectar registros diarios</div>
+                    <div class="pentagon sub-sub-pentagon">S01.2.2 Consolidar atenciones por odontólogo</div>
+                    <div class="pentagon sub-sub-pentagon">S01.2.3 Calcular totales mensuales</div>
+                    <div class="pentagon sub-sub-pentagon">S01.2.4 Presentar reporte al Director</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">S01.3 Gestión de quejas y reclamos</div>
+                    <div class="pentagon sub-sub-pentagon">S01.3.1 Recibir queja del paciente</div>
+                    <div class="pentagon sub-sub-pentagon">S01.3.2 Registrar en formato</div>
+                    <div class="pentagon sub-sub-pentagon">S01.3.3 Asignar a responsable</div>
+                    <div class="pentagon sub-sub-pentagon">S01.3.4 Comunicar solución al paciente</div>
+                </div>
+
+                <!-- S02 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">S02. Gestión de Logística y Compras</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">S02.1 Inventario de insumos odontológicos</div>
+                    <div class="pentagon sub-sub-pentagon">S02.1.1 Registrar stock inicial</div>
+                    <div class="pentagon sub-sub-pentagon">S02.1.2 Definir stock mínimo</div>
+                    <div class="pentagon sub-sub-pentagon">S02.1.3 Realizar conteo físico</div>
+                    <div class="pentagon sub-sub-pentagon">S02.1.4 Generar alerta de reposición</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">S02.2 Recepción y control de calidad de insumos</div>
+                    <div class="pentagon sub-sub-pentagon">S02.2.1 Verificar orden de compra</div>
+                    <div class="pentagon sub-sub-pentagon">S02.2.2 Inspeccionar empaque y fechas</div>
+                    <div class="pentagon sub-sub-pentagon">S02.2.3 Contar cantidades recibidas</div>
+                    <div class="pentagon sub-sub-pentagon">S02.2.4 Aceptar o rechazar lote</div>
+                    
+                </div>
+
+                <!-- S03 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">S03. Gestión Financiera</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">S03.1 Emisión de comprobantes de pago</div>
+                    <div class="pentagon sub-sub-pentagon">S03.1.1 Solicitar datos del paciente</div>
+                    <div class="pentagon sub-sub-pentagon">S03.1.2 Ingresar monto y servicio</div>
+                    <div class="pentagon sub-sub-pentagon">S03.1.3 Generar comprobante</div>
+                    <div class="pentagon sub-sub-pentagon">S03.1.4 Entregar comprobante al paciente</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">S03.2 Control de cuentas por cobrar</div>
+                    <div class="pentagon sub-sub-pentagon">S03.2.1 Identificar deudas pendientes</div>
+                    <div class="pentagon sub-sub-pentagon">S03.2.2 Registrar saldo y vencimiento</div>
+                    <div class="pentagon sub-sub-pentagon">S03.2.3 Enviar recordatorio de pago</div>
+                    <div class="pentagon sub-sub-pentagon">S03.2.4 Actualizar saldo al pagar</div>
+                    
+                </div>
+
+                <!-- S04 -->
+                <div class="process-column">
+                    <div class="pentagon" onclick="toggleSubLevel(this)">S04. Mantenimiento de Equipos e Infraestructura</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">S04.1 Calibración y mantenimiento de unidad dental</div>
+                    <div class="pentagon sub-sub-pentagon">S04.1.1 Verificar funcionamiento diario</div>
+                    <div class="pentagon sub-sub-pentagon">S04.1.2 Limpiar unidad dental</div>
+                    <div class="pentagon sub-sub-pentagon">S04.1.3 Revisar presión de aire y agua</div>
+                    <div class="pentagon sub-sub-pentagon">S04.1.4 Engrasar piezas móviles</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">S04.2 Mantenimiento de autoclave y equipos de esterilización</div>
+                    <div class="pentagon sub-sub-pentagon">S04.2.1 Verificar niveles de agua</div>
+                    <div class="pentagon sub-sub-pentagon">S04.2.2 Limpiar cámara del autoclave</div>
+                    <div class="pentagon sub-sub-pentagon">S04.2.3 Realizar prueba biológica</div>
+                    <div class="pentagon sub-sub-pentagon">S04.2.4 Registrar ciclos de esterilización</div>
+                    <div class="pentagon sub-pentagon" onclick="toggleSubLevel(this)">S04.3 Reparación de infraestructura</div>
+                    <div class="pentagon sub-sub-pentagon">S04.3.1 Detectar y reportar falla</div>
+                    <div class="pentagon sub-sub-pentagon">S04.3.2 Evaluar urgencia</div>
+                    <div class="pentagon sub-sub-pentagon">S04.3.3 Coordinar con técnico</div>
+                    <div class="pentagon sub-sub-pentagon">S04.3.4 Verificar funcionamiento post-reparación</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LEYENDA -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--color-strat);"></div>
+                <span>Estratégicos</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--color-strat-sub);"></div>
+                <span>Procesos</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--color-strat-sub2);"></div>
+                <span>Subprocesos</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--color-value);"></div>
+                <span>Creación de Valor</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--color-support);"></div>
+                <span>Soporte</span>
+            </div>
+        </div>
+        <div class="legend-click-hint">💡 Haz clic en un proceso (Nivel 0 o 1) para desplegar sus subniveles</div>
+
+    </div>
+
+    <script>
+        function toggleSubLevel(element) {
+            let isLevel0 = !element.classList.contains('sub-pentagon') && !element.classList.contains('sub-sub-pentagon');
+            let isLevel1 = element.classList.contains('sub-pentagon');
+            
+            let nextEl = element.nextElementSibling;
+            let currentlyExpanded = element.classList.contains('expanded');
+
+            if (currentlyExpanded) {
+                // Colapsar
+                element.classList.remove('expanded');
+                while (nextEl) {
+                    if (isLevel0) {
+                        if (nextEl.classList.contains('sub-pentagon') || nextEl.classList.contains('sub-sub-pentagon')) {
+                            nextEl.classList.remove('visible');
+                            nextEl.classList.remove('expanded');
+                        } else {
+                            break; // Siguiente Nivel 0
+                        }
+                    } else if (isLevel1) {
+                        if (nextEl.classList.contains('sub-sub-pentagon')) {
+                            nextEl.classList.remove('visible');
+                        } else {
+                            break; // Siguiente Nivel 1 o 0
+                        }
+                    }
+                    nextEl = nextEl.nextElementSibling;
+                }
+            } else {
+                // Expandir
+                element.classList.add('expanded');
+                while (nextEl) {
+                    if (isLevel0) {
+                        if (nextEl.classList.contains('sub-pentagon')) {
+                            nextEl.classList.add('visible');
+                        } else if (nextEl.classList.contains('sub-sub-pentagon')) {
+                            // No expandir Nivel 2 automáticamente
+                        } else {
+                            break;
+                        }
+                    } else if (isLevel1) {
+                        if (nextEl.classList.contains('sub-sub-pentagon')) {
+                            nextEl.classList.add('visible');
+                        } else {
+                            break;
+                        }
+                    }
+                    nextEl = nextEl.nextElementSibling;
+                }
+            }
+        }
+    </script>
+
+</body>
+</html>
